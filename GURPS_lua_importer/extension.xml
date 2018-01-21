@@ -1,0 +1,20 @@
+
+<root version="2.0">
+  <properties>
+    <name>Lua Importer</name>
+    <version>1</version>
+    
+    <author>Legendsmith.au@gmail.co,</author>
+    <description>allows importing lua files exported from GCS using the appropriate lua output template</description>
+    
+    <ruleset>
+      <name>GURPS</name>
+      <minrelease>5</minrelease>
+    </ruleset>
+  </properties>
+ 
+  <base>
+   <script name="luaimport" file="scripts/lua-import.lua" />
+  </base>
+</root>
+
