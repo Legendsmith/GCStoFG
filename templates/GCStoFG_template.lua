@@ -5,6 +5,8 @@
 function onInit()
 	Comm.registerSlashHandler("importcharlua", importCharlua)
 	chars = docharacters()
+	Comm.registerSlashHandler("importnpclua", importNPClua)
+	
 end
 
 --
@@ -48,6 +50,221 @@ function rslConverter(s) --used in skills and spells for parsing the RSL field f
 		return string.match(s,"([A-Z]*[a-z]*)") or "10"
 	end
 end
+
+function importNPClua(fun_name,_char_num)
+	local char_num= tonumber(_char_num)
+	if char_num then
+		Comm.addChatMessage({text="importing character "..chars[char_num]["name"].." as NPC."})
+	else
+		Comm.addChatMessage({text="character not found"})
+		return ""
+	end
+	local luasheet = chars[char_num]
+	local nodeChar = DB.createChild("npc")
+
+	DB.createChild(nodeChar,"attributes") --create attributes branch
+	DB.createChild(nodeChar,"combat") --create combat branch
+	   	 DB.setValue(nodeChar, "attributes.race", "string", reEncode(luasheet.description.race));
+   	 DB.setValue(nodeChar, "attributes.age", "string", reEncode(luasheet.description.age));
+   	 DB.setValue(nodeChar, "attributes.height", "string", reEncode(luasheet.description.height));
+   	 DB.setValue(nodeChar, "attributes.weight", "string", reEncode(luasheet.description.weight));
+   	 DB.setValue(nodeChar, "attributes.sizemodifier", "string", reEncode(luasheet.description.size));
+   	 DB.setValue(nodeChar, "attributes.tl", "string", luasheet.description.tl);
+	--
+	DB.setValue(nodeChar, "attributes.basiclift", "string", luasheet.bl);
+	DB.setValue(nodeChar, "attributes.basicspeed", "string", luasheet.speed.stat);
+	DB.setValue(nodeChar, "attributes.move", "string", luasheet.move.stat);
+	--should work
+	DB.setValue(nodeChar, "attributes.swing", "string", luasheet.sw);
+    DB.setValue(nodeChar, "attributes.thrust", "string", luasheet.thr);
+	--attributes population
+	DB.setValue(nodeChar, "attributes.strength", "number", luasheet.ST.stat );--1 is value of the attribute, 
+	DB.setValue(nodeChar, "name", "string", luasheet.name)
+	DB.setValue(nodeChar, "attributes.dexterity", "number", luasheet.DX.stat );
+	DB.setValue(nodeChar, "attributes.intelligence", "number", luasheet.IQ.stat );
+	DB.setValue(nodeChar, "attributes.health", "number", luasheet.HT.stat );
+	DB.setValue(nodeChar, "attributes.hitpoints", "number", luasheet.HP.stat );
+	DB.setValue(nodeChar, "attributes.fatiguepoints", "number", luasheet.FP.stat );
+	DB.setValue(nodeChar, "attributes.will", "number", luasheet.will.stat );
+	DB.setValue(nodeChar, "attributes.perception", "number", luasheet.per.stat );
+	DB.setValue(nodeChar, "combat.block", "number", tonumber(luasheet.cBlock) or 0);
+    DB.setValue(nodeChar, "combat.parry", "number", tonumber(luasheet.cParry) or 0);
+    DB.setValue(nodeChar, "combat.dodge", "number", luasheet.cDodge or 0);
+	DB.setValue(nodeChar, "combat.dr", "string", luasheet.dr.torso or 0)
+	if luasheet.melee then--add melee weapons. I hope you like for loops
+		print("importing melee weapons")
+		local nodemelee = DB.createChild(nodeChar, "combat.meleecombatlist");
+		--preprocessing
+		local meleeTable = {}
+		local meleeIndex = {}
+		for k,v in pairs(luasheet.melee) do --setup the meleeTable with the names, this allows us to collapse things by usage preventing duplicate entries for each usage of a weapon.
+			if meleeTable[v.name] then
+				--pass, it already exists
+			else --else create entry
+				meleeTable[v.name]={}
+				meleeIndex[v.name]={}
+			end
+			meleeTable[v.name][v.usage]=k
+			meleeIndex[v.name][v.usage]=k
+			for eK,eV in pairs(luasheet.equipment) do --find the corresponding equipment entry for the other info.
+				if eV.name == v.name then
+					meleeIndex[v.name]["equip"]=eK
+				end
+			end
+			
+		end
+		for k,v in pairs(meleeTable) do
+			print(nodemelee)
+			local nodeNew = DB.createChild(nodemelee)
+			DB.setValue(nodeNew, "name", "string", reEncode(k))
+			DB.setValue(nodeNew, "st", "string", "")
+			if luasheet.equipment[meleeIndex[k]["equip"]] then
+				DB.setValue(nodeNew, "cost", "string", luasheet.equipment[meleeIndex[k]["equip"]]["cost"]);
+				DB.setValue(nodeNew, "weight", "string", luasheet.equipment[meleeIndex[k]["equip"]]["weight"]);
+				if luasheet.equipment[meleeIndex[k]["equip"]].modifiers and luasheet.equipment[meleeIndex[k]["equip"]].notes then
+					DB.setValue(nodeNew, "text", "formattedtext", "<h>MODIFIERS</h>\n <p>"..reEncode(v.modifiers).."</p>\n <h>NOTES</h> \n<p>"..reEncode(v.notes).."</p>");
+					elseif luasheet.equipment[meleeIndex[k]["equip"]].modifiers then
+						DB.setValue(nodeNew, "text", "formattedtext", "<h>MODIFIERS</h>\n <p>"..reEncode(v.modifiers).."</p>");
+					elseif luasheet.equipment[meleeIndex[k]["equip"]].notes then
+						DB.setValue(nodeNew, "text", "formattedtext", "<h>NOTES</h>\n <p>"..reEncode(v.notes).."</p>");
+				end
+			end
+			
+			--make the melee mode list
+			local nodeModelist = DB.createChild(nodeNew, "meleemodelist");
+			for kU,vU in pairs(meleeTable[k]) do --key Usage, value Usage
+				local nodeMode = DB.createChild(nodeModelist)
+				local weapon = luasheet.melee[vU]
+				DB.setValue(nodeMode, "damage", "string", weapon.damage);
+				DB.setValue(nodeMode, "level", "number", weapon.level);
+				DB.setValue(nodeMode, "name", "string",  reEncode(weapon.usage));
+				DB.setValue(nodeMode, "parry", "string", weapon.parry)
+				DB.setValue(nodeMode,"reach", "string", weapon.reach)
+				if weapon.st ~= "" then
+					DB.setValue(nodeNew, "st", "string", DB.getValue(nodeNew, "st", "")..reEncode(weapon.st).."/")
+				end
+			end
+			local preST =DB.getValue(nodeNew, "st", "x")
+			DB.setValue(nodeNew, "st", "string", string.sub(preST,1,-2)) --trims the trailing slash off ST.
+		end
+
+	end
+
+	if luasheet.skills then
+		print("importing skills -> abilities")
+		local nodeSkills = DB.createChild(nodeChar, "abilities.abilitieslist");
+		for k,v in pairs(luasheet.skills) do
+			local nodeNew = DB.createChild(nodeSkills);
+			DB.setValue(nodeNew, "name", "string", v.name)
+			DB.setValue(nodeNew, "level", "number", tonumber(v.sl))
+		end	
+		if luasheet.spells then
+			local nodeSpells=nodeSkills
+			for k,v in pairs(luasheet.spells) do
+				local nodeNew = DB.createChild(nodeSpells);
+				DB.setValue(nodeNew, "name", "string", v.name)
+				DB.setValue(nodeNew, "level", "number", tonumber(v.sl))
+			end	
+		end
+	end
+	local nodeTraits = DB.createChild(nodeChar, "traits")
+	local desc = "# Advantages\n"
+
+	for k,v in pairs(luasheet.advantages) do
+		if v.modifiers == "" then
+			desc = desc.."#"..v.name.."\n"
+		else
+			 desc = desc.."#"..v.name.."\n ##"..v.modifiers.."\n"
+		end
+	end
+	for k,v in pairs(luasheet.perks) do
+		if v.modifiers == "" then
+			desc = desc.."#"..v.name.."\n"
+		else
+			 desc = desc.."#"..v.name.."\n ##"..v.modifiers.."\n"
+		end
+	end
+	desc = desc.."# Disadvantages\n"
+	for k,v in pairs(luasheet.disadvantages) do
+		if v.modifiers == "" then
+			desc = desc.."#"..v.name.."\n"
+		else
+			 desc = desc.."#"..v.name.."\n ##"..v.modifiers.."\n"
+		end
+	end
+	for k,v in pairs(luasheet.quirks) do
+		if v.modifiers == "" then
+			desc = desc.."#"..v.name.."\n"
+		else
+			 desc = desc.."#"..v.name.."\n ##"..v.modifiers.."\n"
+		end
+	end
+	local nodeDesc = DB.setValue(nodeTraits, "description", "string", desc)
+
+	if luasheet.range then--add range weapons. 
+		print("importing ranged weapons")
+		local nodeRanged = DB.createChild(nodeChar, "combat.rangedcombatlist");
+		--preprocessing
+		local rangedTable = {}
+		local rangedIndex = {}
+		for k,v in pairs(luasheet.range) do --setup the rangedTable with the names, this allows us to collapse things by usage preventing duplicate entries for each usage of a weapon.
+			if rangedTable[v.name] then
+				--pass, it already exists
+			else --else create entry
+				rangedTable[v.name]={}
+				rangedIndex[v.name]={}
+			end
+			rangedTable[v.name][v.usage]=k
+			rangedIndex[v.name][v.usage]=k
+			for eK,eV in pairs(luasheet.equipment) do --find the corresponding equipment entry for the other info.
+				if eV.name == v.name then
+					rangedIndex[v.name]["equip"]=eK
+				end
+			end
+			
+		end
+		for k,v in pairs(rangedTable) do
+			local nodeNew = DB.createChild(nodeRanged)
+			DB.setValue(nodeNew, "name", "string", reEncode(k))
+			DB.setValue(nodeNew, "st", "string", "")
+			if luasheet.equipment[rangedIndex[k]["equip"]] then
+				DB.setValue(nodeNew, "cost", "string", luasheet.equipment[rangedIndex[k]["equip"]]["cost"]);
+				DB.setValue(nodeNew, "weight", "string", luasheet.equipment[rangedIndex[k]["equip"]]["weight"]);
+				if luasheet.equipment[rangedIndex[k]["equip"]].modifiers and luasheet.equipment[rangedIndex[k]["equip"]].notes then
+				DB.setValue(nodeNew, "text", "formattedtext", "<h>MODIFIERS</h>\n <p>"..reEncode(v.modifiers).."</p>\n <h>NOTES</h> \n<p>"..reEncode(v.notes).."</p>");
+				elseif luasheet.equipment[rangedIndex[k]["equip"]].modifiers then
+					DB.setValue(nodeNew, "text", "formattedtext", "<h>MODIFIERS</h>\n <p>"..reEncode(v.modifiers).."</p>");
+				elseif luasheet.equipment[rangedIndex[k]["equip"]].notes then
+					DB.setValue(nodeNew, "text", "formattedtext", "<h>NOTES</h>\n <p>"..reEncode(v.notes).."</p>");
+				end
+			end
+			--make the ranged mode list
+			local nodeModelist = DB.createChild(nodeNew, "rangedmodelist");
+			for kU,vU in pairs(rangedTable[k]) do --key Usage, value Usage
+				local nodeMode = DB.createChild(nodeModelist)
+				local weapon = luasheet.range[vU]
+				DB.setValue(nodeMode, "damage", "string", weapon.damage);
+				DB.setValue(nodeMode, "level", "number", weapon.level);
+				DB.setValue(nodeMode, "name", "string", reEncode(weapon.usage));
+				DB.setValue(nodeMode, "acc", "number", weapon.acc)
+				DB.setValue(nodeMode,"range", "string", weapon.range)
+				DB.setValue(nodeMode,"rof", "string", weapon.rof)
+				DB.setValue(nodeMode,"rcl", "number", tonumber(weapon.recoil) or 1)
+				DB.setValue(nodeMode,"shots", "string", tonumber(weapon.shots or 1) or 1)
+				if weapon.st ~= "" then
+					DB.setValue(nodeNew, "st", "string", DB.getValue(nodeNew, "st", "")..reEncode(weapon.st).."/")
+				end
+				if weapon.bulk ~= "" then
+					DB.setValue(nodeNew,"bulk", "number", tonumber(weapon.bulk) or 0)
+				end
+			end
+			local preST =DB.getValue(nodeNew, "st", "x")
+			DB.setValue(nodeNew, "st", "string", string.sub(preST,1,-2)) --trims the trailing slash off ST.
+		end
+	end
+
+end
+
 --main importer function
 function importCharlua(fun_name,_char_num)
 	local char_num= tonumber(_char_num)
@@ -482,7 +699,8 @@ end
 
 function docharacters()
 	return{
-	--INSERT CHARACTER DATA HERE! Append each with a , too or it won't work. Import with /importcharlua #, where # is the order of characters in this table.
+--Lua export template by legendsmith
+--Legendsmith#1102 on discord
 {
 	["name"]="@NAME",
 	["points"]=@TOTAL_POINTS,
