@@ -99,7 +99,7 @@
 	},
 	["range"]={
 	@RANGED_LOOP_START
-	{name="@DESCRIPTION_PRIMARY", usage="@USAGE",level=@LEVEL,acc=@ACCURACY,range="@RANGE",damage="@DAMAGE",rof="@ROF",st="@STRENGTH",bulk="@BULK",recoil="@RECOIL",shots="@SHOTS",notes="@DESCRIPTION_NOTES"},@RANGED_LOOP_END
+	{name="@DESCRIPTION_PRIMARY", usage="@USAGE",level=@LEVEL,acc="@ACCURACY",range="@RANGE",damage="@DAMAGE",rof="@ROF",st="@STRENGTH",bulk="@BULK",recoil="@RECOIL",shots="@SHOTS",notes="@DESCRIPTION_NOTES"},@RANGED_LOOP_END
 	nil
 	},
 	["dr"]={

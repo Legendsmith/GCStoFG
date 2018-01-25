@@ -246,7 +246,7 @@ function importNPClua(fun_name,_char_num)
 				DB.setValue(nodeMode, "damage", "string", weapon.damage);
 				DB.setValue(nodeMode, "level", "number", weapon.level);
 				DB.setValue(nodeMode, "name", "string", reEncode(weapon.usage));
-				DB.setValue(nodeMode, "acc", "number", weapon.acc)
+				DB.setValue(nodeMode, "acc", "number", tonumber(weapon.acc))
 				DB.setValue(nodeMode,"range", "string", weapon.range)
 				DB.setValue(nodeMode,"rof", "string", weapon.rof)
 				DB.setValue(nodeMode,"rcl", "number", tonumber(weapon.recoil) or 1)
@@ -577,7 +577,7 @@ function importCharlua(fun_name,_char_num)
 				DB.setValue(nodeMode, "damage", "string", weapon.damage);
 				DB.setValue(nodeMode, "level", "number", weapon.level);
 				DB.setValue(nodeMode, "name", "string", reEncode(weapon.usage));
-				DB.setValue(nodeMode, "acc", "number", weapon.acc)
+				DB.setValue(nodeMode, "acc", "number", tonumber(weapon.acc));
 				DB.setValue(nodeMode,"range", "string", weapon.range)
 				DB.setValue(nodeMode,"rof", "string", weapon.rof)
 				DB.setValue(nodeMode,"rcl", "number", tonumber(weapon.recoil) or 1)
